@@ -1,14 +1,44 @@
-name: Windows CMake Build
+name: Windows and core verification
 on:
   push:
-    branches: [main]
+    branches: [main, 'feature/**']
   pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
 jobs:
-  build:
-    runs-on: windows-latest
+  windows:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022
+            generator: Visual Studio 17 2022
+          - os: windows-2025-vs2026
+            generator: Visual Studio 18 2026
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - name: Install CMake supporting both Visual Studio generations
+        run: python -m pip install cmake==4.2.3
       - name: Configure
-        run: cmake -S . -B build -A x64
-      - name: Build
+        run: cmake -S . -B build -G "${{ matrix.generator }}" -A x64 -DBUILD_TESTING=ON
+      - name: Build Debug
+        run: cmake --build build --config Debug --parallel
+      - name: Test Debug
+        run: ctest --test-dir build -C Debug --output-on-failure
+      - name: Build Release
         run: cmake --build build --config Release --parallel
+      - name: Test Release
+        run: ctest --test-dir build -C Release --output-on-failure
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AcidExternal-${{ matrix.os }}-x64
+          path: build/Release/AcidExternal.exe
+  core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -S . -B build -DACID_BUILD_APP=OFF -DBUILD_TESTING=ON
+      - run: cmake --build build --parallel
+      - run: ctest --test-dir build --output-on-failure
