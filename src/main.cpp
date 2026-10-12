@@ -2,6 +2,8 @@
 #include <d3d11.h>
 #include <algorithm>
 #include <cmath>
+#include "ui/premium_ui.h"
+#include <windowsx.h>
 #include "imgui.h"
 #include "backends/imgui_impl_win32.h"
 #include "backends/imgui_impl_dx11.h"
@@ -47,6 +49,39 @@ static void CleanupDevice() {
 }
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND, UINT, WPARAM, LPARAM);
 static LRESULT WINAPI WindowProc(HWND hwnd, UINT message, WPARAM wp, LPARAM lp) {
+    if (message == WM_NCHITTEST) {
+        POINT point{GET_X_LPARAM(lp), GET_Y_LPARAM(lp)};
+        ScreenToClient(hwnd, &point);
+        RECT client{};
+        GetClientRect(hwnd, &client);
+        if (!IsZoomed(hwnd)) {
+            const bool left = point.x < 7, right = point.x >= client.right - 7;
+            const bool top = point.y < 7, bottom = point.y >= client.bottom - 7;
+            if (top && left) return HTTOPLEFT;
+            if (top && right) return HTTOPRIGHT;
+            if (bottom && left) return HTBOTTOMLEFT;
+            if (bottom && right) return HTBOTTOMRIGHT;
+            if (left) return HTLEFT;
+            if (right) return HTRIGHT;
+            if (top) return HTTOP;
+            if (bottom) return HTBOTTOM;
+        }
+        if (point.y < 54 && point.x < client.right - 156) return HTCAPTION;
+        return HTCLIENT;
+    }
+    if (message == WM_NCCALCSIZE && wp) return 0;
+    if (message == WM_GETMINMAXINFO) {
+        auto* limits = reinterpret_cast<MINMAXINFO*>(lp);
+        limits->ptMinTrackSize = POINT{600, 480};
+        MONITORINFO monitor{sizeof(monitor)};
+        if (GetMonitorInfoW(MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST), &monitor)) {
+            limits->ptMaxPosition = POINT{monitor.rcWork.left - monitor.rcMonitor.left,
+                monitor.rcWork.top - monitor.rcMonitor.top};
+            limits->ptMaxSize = POINT{monitor.rcWork.right - monitor.rcWork.left,
+                monitor.rcWork.bottom - monitor.rcWork.top};
+        }
+        return 0;
+    }
     if (ImGui::GetCurrentContext() && ImGui_ImplWin32_WndProcHandler(hwnd, message, wp, lp))
         return 1;
     switch (message) {
@@ -85,18 +120,11 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
     io.IniFilename = nullptr;
-    ImGui::StyleColorsDark();
-    ImGuiStyle& style = ImGui::GetStyle();
-    style.WindowRounding = 10.0f;
-    style.FrameRounding = 7.0f;
-    style.GrabRounding = 7.0f;
+    acid::ui::ApplyTheme();
     ImGui_ImplWin32_Init(hwnd);
     ImGui_ImplDX11_Init(device, context);
 
-    int tab = 0;
-    float fov = 110.0f;
-    bool showCircle = true;
-    float accent[3] = {0.38f, 0.34f, 0.95f};
+    acid::ui::State uiState;
     bool running = true;
     while (running) {
         MSG msg{};
@@ -110,49 +138,10 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
         ImGui_ImplDX11_NewFrame();
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
-        style.Colors[ImGuiCol_Button] = ImVec4(accent[0], accent[1], accent[2], 1.0f);
-        style.Colors[ImGuiCol_SliderGrab] = ImVec4(accent[0], accent[1], accent[2], 1.0f);
-        ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
-        ImGui::SetNextWindowSize(io.DisplaySize, ImGuiCond_Always);
-        ImGui::Begin("Acid External", nullptr,
-            ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
-            ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings);
-        ImGui::TextColored(ImVec4(accent[0], accent[1], accent[2], 1), "ACID / EXTERNAL V2");
-        ImGui::Separator();
-        ImGui::BeginChild("Navigation", ImVec2(190, 0), ImGuiChildFlags_Borders);
-        if (ImGui::Selectable("Dashboard", tab == 0)) tab = 0;
-        if (ImGui::Selectable("FOV Preview", tab == 1)) tab = 1;
-        if (ImGui::Selectable("Appearance", tab == 2)) tab = 2;
-        ImGui::EndChild();
-        ImGui::SameLine();
-        ImGui::BeginChild("Content", ImVec2(0, 0), ImGuiChildFlags_Borders);
-        if (tab == 0) {
-            ImGui::Text("Diagnostics");
-            ImGui::Separator();
-            ImGui::Text("FPS: %.1f", io.Framerate);
-            ImGui::Text("Frame time: %.2f ms", io.Framerate > 0 ? 1000.0f / io.Framerate : 0.0f);
-            ImGui::TextWrapped("Standalone local UI. No game attachment or process access.");
-        } else if (tab == 1) {
-            ImGui::Text("FOV Visualization");
-            ImGui::SliderFloat("Radius", &fov, 20.0f, 300.0f, "%.0f px");
-            ImGui::Checkbox("Show circle", &showCircle);
-            ImVec2 origin = ImGui::GetCursorScreenPos();
-            ImVec2 avail = ImGui::GetContentRegionAvail();
-            ImGui::InvisibleButton("preview", ImVec2(std::max(1.0f, avail.x), std::max(1.0f, avail.y)));
-            if (showCircle) {
-                ImVec2 center(origin.x + avail.x * 0.5f, origin.y + avail.y * 0.5f);
-                ImGui::GetWindowDrawList()->AddCircle(center, fov,
-                    ImGui::ColorConvertFloat4ToU32(ImVec4(accent[0], accent[1], accent[2], 1)), 96, 2.0f);
-            }
-        } else {
-            ImGui::Text("Appearance");
-            ImGui::ColorEdit3("Accent color", accent);
-            if (ImGui::Button("Reset theme")) {
-                accent[0] = 0.38f; accent[1] = 0.34f; accent[2] = 0.95f;
-            }
-        }
-        ImGui::EndChild();
-        ImGui::End();
+        const auto actions = acid::ui::Render(uiState, IsZoomed(hwnd) != FALSE);
+        if (actions.minimize) ShowWindow(hwnd, SW_MINIMIZE);
+        if (actions.maximize) ShowWindow(hwnd, IsZoomed(hwnd) ? SW_RESTORE : SW_MAXIMIZE);
+        if (actions.close) PostMessageW(hwnd, WM_CLOSE, 0, 0);
         ImGui::Render();
         const float clear[4] = {0.055f, 0.061f, 0.085f, 1.0f};
         context->OMSetRenderTargets(1, &target, nullptr);
@@ -168,3 +157,4 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
     UnregisterClassW(wc.lpszClassName, instance);
     return 0;
 }
+

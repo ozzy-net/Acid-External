@@ -12,6 +12,7 @@ FetchContent_MakeAvailable(imgui)
 
 add_executable(AcidExternal WIN32
   src/main.cpp
+  src/ui/premium_ui.cpp
   ${imgui_SOURCE_DIR}/imgui.cpp
   ${imgui_SOURCE_DIR}/imgui_draw.cpp
   ${imgui_SOURCE_DIR}/imgui_tables.cpp
@@ -25,3 +26,21 @@ target_compile_definitions(AcidExternal PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_
 if(MSVC)
   target_compile_options(AcidExternal PRIVATE /W4 /EHsc)
 endif()
+
+option(ACID_UI_SMOKE_TEST "Build the headless UI smoke test" OFF)
+if(ACID_UI_SMOKE_TEST)
+  enable_testing()
+  add_executable(AcidUiSmoke
+    src/ui/smoke_test.cpp src/ui/premium_ui.cpp
+    ${imgui_SOURCE_DIR}/imgui.cpp ${imgui_SOURCE_DIR}/imgui_draw.cpp
+    ${imgui_SOURCE_DIR}/imgui_tables.cpp ${imgui_SOURCE_DIR}/imgui_widgets.cpp)
+  target_include_directories(AcidUiSmoke PRIVATE ${imgui_SOURCE_DIR})
+  # Keep assertions enabled for the smoke test in Release configurations.
+  if(MSVC)
+    target_compile_options(AcidUiSmoke PRIVATE /UNDEBUG)
+  else()
+    target_compile_options(AcidUiSmoke PRIVATE -UNDEBUG)
+  endif()
+  add_test(NAME AcidUiSmoke COMMAND AcidUiSmoke)
+endif()
+
