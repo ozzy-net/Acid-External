@@ -1,14 +1,26 @@
 name: Windows CMake Build
 on:
   push:
-    branches: [main]
+    branches: [main, integration/acid-v2]
   pull_request:
+permissions:
+  contents: read
 jobs:
   build:
     runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        configuration: [Debug, Release]
     steps:
       - uses: actions/checkout@v4
       - name: Configure
-        run: cmake -S . -B build -A x64
+        run: cmake -S . -B build -A x64 -DBUILD_TESTING=ON
       - name: Build
-        run: cmake --build build --config Release --parallel
+        run: cmake --build build --config ${{ matrix.configuration }} --parallel
+      - name: Test
+        run: ctest --test-dir build -C ${{ matrix.configuration }} --output-on-failure
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AcidExternal-${{ matrix.configuration }}
+          path: build/${{ matrix.configuration }}/AcidExternal.exe
