@@ -2,6 +2,7 @@
 #include "imgui.h"
 #include <algorithm>
 #include <cmath>
+#include <cfloat>
 
 namespace acid::ui {
 namespace {
@@ -36,7 +37,7 @@ void Preview(const State& s) {
         draw->AddLine(ImVec2(origin.x, origin.y + y), ImVec2(origin.x + size.x, origin.y + y),
             IM_COL32(28, 37, 58, 120));
     const ImVec2 center(origin.x + size.x * 0.5f, origin.y + size.y * 0.5f);
-    if (s.showCircle) {
+    if (s.circle) {
         draw->AddCircle(center, s.radius, ImGui::ColorConvertFloat4ToU32(Accent(s, 0.12f)), 96, 10);
         draw->AddCircle(center, s.radius, ImGui::ColorConvertFloat4ToU32(Accent(s)), 96, 2);
     }
@@ -71,7 +72,7 @@ void ApplyTheme() {
     s.Colors[ImGuiCol_ButtonActive] = ImVec4(0.31f, 0.28f, 0.68f, 1);
 }
 
-WindowActions Render(State& state, bool maximized) {
+WindowActions Render(State& state, bool maximized, const diagnostics::Snapshot& snapshot, const std::string& status) {
     WindowActions actions;
     const ImGuiIO& io = ImGui::GetIO();
     ImGuiStyle& style = ImGui::GetStyle();
@@ -135,15 +136,26 @@ WindowActions Render(State& state, bool maximized) {
         Card("Timing", stacked ? width : (width - style.ItemSpacing.x) / 2, "FRAME TIME",
             io.Framerate > 0 ? 1000 / io.Framerate : 0, "ms");
         ImGui::Spacing();
-        ImGui::BeginChild("Session", ImVec2(0, 150), ImGuiChildFlags_Borders);
+        ImGui::BeginChild("Session", ImVec2(0, 0), ImGuiChildFlags_Borders);
         ImGui::Text("Session overview");
         ImGui::TextWrapped("Standalone local UI. No game attachment or process access.");
         Label("Dear ImGui / DirectX 11");
+        if (snapshot.process.cpu_percent) ImGui::Text("Process CPU: %.1f%% (100%% per core)", *snapshot.process.cpu_percent);
+        else ImGui::TextUnformatted("Process CPU: unavailable / warming up");
+        if (snapshot.process.memory) ImGui::Text("Working set: %.1f MiB | Private: %.1f MiB",
+            snapshot.process.memory->working_set_bytes / 1048576.0, snapshot.process.memory->private_bytes / 1048576.0);
+        else ImGui::TextUnformatted("Process memory: unavailable");
+        if (snapshot.process.uptime_seconds) ImGui::Text("Process uptime: %.1f seconds", *snapshot.process.uptime_seconds);
+        if (!snapshot.frame_times_ms.empty()) ImGui::PlotLines("Frame ms", snapshot.frame_times_ms.data(),
+            static_cast<int>(snapshot.frame_times_ms.size()), 0, nullptr, 0, FLT_MAX, ImVec2(0, 70));
+        actions.exportReport = ImGui::Button("Export diagnostics report");
+        if (!status.empty()) ImGui::TextWrapped("%s", status.c_str());
+        for (const auto& entry : snapshot.logs) ImGui::TextWrapped("%s", entry.message.c_str());
         ImGui::EndChild();
     } else if (state.page == 1) {
         ImGui::SetNextItemWidth(std::max(100.0f, ImGui::GetContentRegionAvail().x - 85));
         ImGui::SliderFloat("Radius", &state.radius, 20, 300, "%.0f px");
-        ImGui::Checkbox("Show circle", &state.showCircle);
+        ImGui::Checkbox("Show circle", &state.circle);
         Label("Preview is clipped to the canvas at smaller window sizes.");
         Preview(state);
     } else {
@@ -151,11 +163,11 @@ WindowActions Render(State& state, bool maximized) {
         ImGui::Text("Accent palette");
         ImGui::TextWrapped("A dark blue foundation with your choice of accent.");
         ImGui::SetNextItemWidth(std::min(320.0f, ImGui::GetContentRegionAvail().x));
-        ImGui::ColorEdit3("##accent", state.accent);
+        ImGui::ColorEdit3("##accent", state.accent.data());
         if (ImGui::Button("Reset theme")) {
             state.accent[0] = 0.38f; state.accent[1] = 0.34f; state.accent[2] = 0.95f;
         }
-        Label("Changes apply immediately for this session.");
+        Label("Settings are saved when the application closes.");
         ImGui::EndChild();
     }
     ImGui::PopStyleVar();

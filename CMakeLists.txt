@@ -2,48 +2,60 @@ cmake_minimum_required(VERSION 3.21)
 project(AcidExternal VERSION 2.0.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-include(FetchContent)
-FetchContent_Declare(imgui
-  GIT_REPOSITORY https://github.com/ocornut/imgui.git
-  GIT_TAG v1.91.9b
-  GIT_SHALLOW TRUE)
-FetchContent_MakeAvailable(imgui)
-
-add_executable(AcidExternal WIN32
-  src/main.cpp
-  src/ui/premium_ui.cpp
-  ${imgui_SOURCE_DIR}/imgui.cpp
-  ${imgui_SOURCE_DIR}/imgui_draw.cpp
-  ${imgui_SOURCE_DIR}/imgui_tables.cpp
-  ${imgui_SOURCE_DIR}/imgui_widgets.cpp
-  ${imgui_SOURCE_DIR}/backends/imgui_impl_win32.cpp
-  ${imgui_SOURCE_DIR}/backends/imgui_impl_dx11.cpp)
-target_include_directories(AcidExternal PRIVATE
-  ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends)
-target_link_libraries(AcidExternal PRIVATE d3d11 dxgi)
-target_compile_definitions(AcidExternal PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
-if(MSVC)
-  target_compile_options(AcidExternal PRIVATE /W4 /EHsc)
-endif()
-
+set(CMAKE_CXX_EXTENSIONS OFF)
 include(CTest)
 add_subdirectory(src/diagnostics)
-target_link_libraries(AcidExternal PRIVATE acid_diagnostics)
-option(ACID_UI_SMOKE_TEST "Build the headless UI smoke test" OFF)
-if(ACID_UI_SMOKE_TEST)
-  enable_testing()
-  add_executable(AcidUiSmoke
-    src/ui/smoke_test.cpp src/ui/premium_ui.cpp
-    ${imgui_SOURCE_DIR}/imgui.cpp ${imgui_SOURCE_DIR}/imgui_draw.cpp
-    ${imgui_SOURCE_DIR}/imgui_tables.cpp ${imgui_SOURCE_DIR}/imgui_widgets.cpp)
-  target_include_directories(AcidUiSmoke PRIVATE ${imgui_SOURCE_DIR})
-  # Keep assertions enabled for the smoke test in Release configurations.
-  if(MSVC)
-    target_compile_options(AcidUiSmoke PRIVATE /UNDEBUG)
-  else()
-    target_compile_options(AcidUiSmoke PRIVATE -UNDEBUG)
-  endif()
-  add_test(NAME AcidUiSmoke COMMAND AcidUiSmoke)
+add_library(acid_config src/config/Config.cpp)
+target_include_directories(acid_config PUBLIC src)
+if(WIN32)
+  target_compile_definitions(acid_config PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 endif()
-
+include(FetchContent)
+FetchContent_Declare(imgui GIT_REPOSITORY https://github.com/ocornut/imgui.git GIT_TAG v1.91.9b GIT_SHALLOW TRUE)
+FetchContent_MakeAvailable(imgui)
+add_library(acid_imgui ${imgui_SOURCE_DIR}/imgui.cpp ${imgui_SOURCE_DIR}/imgui_draw.cpp
+  ${imgui_SOURCE_DIR}/imgui_tables.cpp ${imgui_SOURCE_DIR}/imgui_widgets.cpp)
+target_include_directories(acid_imgui PUBLIC ${imgui_SOURCE_DIR})
+add_library(acid_ui src/ui/premium_ui.cpp)
+target_include_directories(acid_ui PUBLIC src)
+target_link_libraries(acid_ui PUBLIC acid_imgui acid_config acid_diagnostics)
+if(WIN32)
+  target_sources(acid_imgui PRIVATE ${imgui_SOURCE_DIR}/backends/imgui_impl_win32.cpp ${imgui_SOURCE_DIR}/backends/imgui_impl_dx11.cpp)
+  target_compile_definitions(acid_imgui PUBLIC UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+  target_link_libraries(acid_imgui PUBLIC d3d11 dxgi d3dcompiler dwmapi)
+  add_library(acid_rendering src/rendering/dx11_renderer.cpp)
+  target_include_directories(acid_rendering PUBLIC src/rendering)
+  target_link_libraries(acid_rendering PUBLIC acid_imgui)
+  add_executable(AcidExternal WIN32 src/main.cpp)
+  target_link_libraries(AcidExternal PRIVATE acid_ui acid_rendering shell32 ole32)
+  if(MSVC)
+    target_compile_options(AcidExternal PRIVATE /W4 /EHsc)
+    target_link_options(AcidExternal PRIVATE "/MANIFEST:EMBED" "/MANIFESTINPUT:${CMAKE_CURRENT_SOURCE_DIR}/assets/application.manifest")
+    target_compile_options(acid_rendering PRIVATE /W4 /EHsc)
+  endif()
+endif()
+if(BUILD_TESTING)
+  add_executable(AcidUiSmoke src/ui/smoke_test.cpp)
+  target_link_libraries(AcidUiSmoke PRIVATE acid_ui)
+  add_test(NAME AcidUiSmoke COMMAND AcidUiSmoke)
+  add_executable(frame_state_test src/rendering/tests/frame_state_test.cpp)
+  target_include_directories(frame_state_test PRIVATE src/rendering)
+  add_test(NAME frame_state COMMAND frame_state_test)
+  add_executable(settings_test tests/settings_test.cpp)
+  target_link_libraries(settings_test PRIVATE acid_config)
+  add_test(NAME settings COMMAND settings_test)
+  foreach(test AcidUiSmoke frame_state_test)
+    if(MSVC)
+      target_compile_options(${test} PRIVATE /UNDEBUG)
+    else()
+      target_compile_options(${test} PRIVATE -UNDEBUG)
+    endif()
+  endforeach()
+  if(WIN32)
+    add_executable(renderer_smoke src/rendering/tests/renderer_smoke.cpp)
+    target_link_libraries(renderer_smoke PRIVATE acid_rendering)
+    add_test(NAME renderer_smoke COMMAND renderer_smoke)
+    add_test(NAME application_smoke COMMAND AcidExternal --smoke-test)
+    set_tests_properties(renderer_smoke application_smoke PROPERTIES TIMEOUT 30)
+  endif()
+endif()

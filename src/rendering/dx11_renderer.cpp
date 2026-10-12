@@ -43,7 +43,13 @@ HRESULT Dx11Renderer::CreateDeviceAndSwapChain() {
     if (debug_) flags |= D3D11_CREATE_DEVICE_DEBUG;
     HRESULT hr = D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr,
         flags, levels, 1, D3D11_SDK_VERSION, device_.GetAddressOf(), nullptr, context_.GetAddressOf());
-    if (FAILED(hr)) return Fail("D3D11CreateDevice", hr);
+    if (FAILED(hr)) {
+        device_.Reset(); context_.Reset();
+        hr = D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_WARP, nullptr,
+            flags & ~D3D11_CREATE_DEVICE_DEBUG, levels, 1, D3D11_SDK_VERSION,
+            device_.GetAddressOf(), nullptr, context_.GetAddressOf());
+    }
+    if (FAILED(hr)) return Fail("D3D11CreateDevice (hardware and WARP)", hr);
     ComPtr<IDXGIDevice> dxgiDevice;
     ComPtr<IDXGIAdapter> adapter;
     ComPtr<IDXGIFactory1> factory;

@@ -22,7 +22,7 @@ int main() {
             for (int frame = 0; frame < 60; ++frame) {
                 io.DeltaTime = 1.0f / 60.0f;
                 state.radius = frame % 2 ? 20 : 300;
-                state.showCircle = frame % 3 != 0;
+                state.circle = frame % 3 != 0;
                 ImGui::NewFrame();
                 const auto actions = acid::ui::Render(state, false);
                 assert(!actions.close && !actions.minimize && !actions.maximize);
