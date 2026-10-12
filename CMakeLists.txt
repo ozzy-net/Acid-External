@@ -1,27 +1,45 @@
 cmake_minimum_required(VERSION 3.21)
-project(AcidExternal VERSION 2.0.0 LANGUAGES CXX)
+project(AcidExternal VERSION 2.1.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-include(FetchContent)
-FetchContent_Declare(imgui
-  GIT_REPOSITORY https://github.com/ocornut/imgui.git
-  GIT_TAG v1.91.9b
-  GIT_SHALLOW TRUE)
-FetchContent_MakeAvailable(imgui)
-
-add_executable(AcidExternal WIN32
-  src/main.cpp
-  ${imgui_SOURCE_DIR}/imgui.cpp
-  ${imgui_SOURCE_DIR}/imgui_draw.cpp
-  ${imgui_SOURCE_DIR}/imgui_tables.cpp
-  ${imgui_SOURCE_DIR}/imgui_widgets.cpp
-  ${imgui_SOURCE_DIR}/backends/imgui_impl_win32.cpp
-  ${imgui_SOURCE_DIR}/backends/imgui_impl_dx11.cpp)
-target_include_directories(AcidExternal PRIVATE
-  ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends)
-target_link_libraries(AcidExternal PRIVATE d3d11 dxgi)
-target_compile_definitions(AcidExternal PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
-if(MSVC)
-  target_compile_options(AcidExternal PRIVATE /W4 /EHsc)
+set(CMAKE_CXX_EXTENSIONS OFF)
+include(CTest)
+add_library(acid_config src/config/Config.cpp)
+target_include_directories(acid_config PUBLIC src)
+if(WIN32)
+  target_compile_definitions(acid_config PUBLIC UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+endif()
+if(BUILD_TESTING)
+  add_executable(AcidCoreTests tests/CoreTests.cpp)
+  target_link_libraries(AcidCoreTests PRIVATE acid_config)
+  add_test(NAME Core COMMAND AcidCoreTests)
+endif()
+option(ACID_BUILD_APP "Build Windows desktop application" ${WIN32})
+if(ACID_BUILD_APP)
+  if(NOT WIN32)
+    message(FATAL_ERROR "AcidExternal requires Windows 10/11. Use -DACID_BUILD_APP=OFF for portable core tests.")
+  endif()
+  include(FetchContent)
+  FetchContent_Declare(imgui GIT_REPOSITORY https://github.com/ocornut/imgui.git GIT_TAG v1.91.9b GIT_SHALLOW TRUE)
+  FetchContent_MakeAvailable(imgui)
+  add_library(acid_imgui STATIC
+    ${imgui_SOURCE_DIR}/imgui.cpp ${imgui_SOURCE_DIR}/imgui_draw.cpp
+    ${imgui_SOURCE_DIR}/imgui_tables.cpp ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_win32.cpp ${imgui_SOURCE_DIR}/backends/imgui_impl_dx11.cpp)
+  target_include_directories(acid_imgui PUBLIC ${imgui_SOURCE_DIR})
+  target_compile_definitions(acid_imgui PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+  target_link_libraries(acid_imgui PUBLIC d3d11 dxgi d3dcompiler dwmapi)
+  add_executable(AcidExternal WIN32 src/main.cpp src/core/Application.cpp
+    src/ui/Interface.cpp src/diagnostics/Diagnostics.cpp src/rendering/Renderer.cpp)
+  target_link_libraries(AcidExternal PRIVATE acid_config acid_imgui psapi shell32 ole32)
+  target_compile_definitions(AcidExternal PRIVATE _WIN32_WINNT=0x0A00 WINVER=0x0A00)
+  if(MSVC)
+    target_compile_options(AcidExternal PRIVATE /W4 /permissive- /EHsc /utf-8)
+    target_compile_options(acid_config PRIVATE /W4 /permissive- /EHsc /utf-8)
+    target_link_options(AcidExternal PRIVATE "/MANIFEST:EMBED" "/MANIFESTINPUT:${CMAKE_CURRENT_SOURCE_DIR}/assets/application.manifest")
+  endif()
+  if(BUILD_TESTING)
+    add_test(NAME DesktopSmoke COMMAND AcidExternal --smoke-test)
+    set_tests_properties(DesktopSmoke PROPERTIES TIMEOUT 30)
+  endif()
 endif()
