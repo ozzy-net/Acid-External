@@ -25,3 +25,7 @@ target_compile_definitions(AcidExternal PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_
 if(MSVC)
   target_compile_options(AcidExternal PRIVATE /W4 /EHsc)
 endif()
+
+include(CTest)
+add_subdirectory(src/diagnostics)
+target_link_libraries(AcidExternal PRIVATE acid_diagnostics)
