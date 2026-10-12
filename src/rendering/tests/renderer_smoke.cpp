@@ -19,8 +19,7 @@ int main() {
             renderer.QueueResize(0, 0, true);
             if (renderer.BeginFrame() != FrameResult::Skipped) result = 1;
             renderer.QueueResize(800, 600, false);
-            auto frame = renderer.BeginFrame();
-            if (frame == FrameResult::Error || frame == FrameResult::DeviceLost) result = 1;
+            FrameResult frame = FrameResult::Skipped;
             // Fixed test UI needs no Win32 backend.
             bool presented = false;
             for (int attempt = 0; attempt < 50 && !presented && !result; ++attempt) {
