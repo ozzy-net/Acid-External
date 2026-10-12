@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | Diagnostics, PR #1 | `083274d` | Integrated: bounded histories/logs, explicit unavailable counters, RAII report writes, current-process scope. |
 | Premium UI | `2226ae9` | Integrated: responsive clipped UI and native controls; replaced its unchecked raw DirectX entry point and connected real diagnostics. |
-| Rendering/performance | `aa2424a` | Integrated: COM ownership, deferred resize, flip-model/legacy fallback, latency pacing, loss recovery. Added hardware-to-WARP fallback and fixed smoke test consuming two latency waits before rendering. |
+| Rendering/performance | `06dba43` | Integrated: COM ownership, deferred resize, flip-model/legacy fallback, latency pacing, loss recovery. Added hardware-to-WARP fallback and fixed smoke test consuming two latency waits before rendering. |
 | Build QA | `43f66aa` | Matches main; retained foundation and expanded CI to Debug/Release plus integration tests. |
 | Premium diagnostics, PR #2 | `db1618f` | Became ready during integration; reviewed and reused validated JSON configuration and application manifest. Competing UI/diagnostics/renderer implementations excluded to maintain one implementation per module. |
 | Separate configuration / sixth agent | No published branch or PR at inspection | Pending. Integration supplies a small validated persistence module for existing UI settings. |
@@ -30,7 +30,11 @@ application instances are not supported for shared settings writes.
 ## Validation and limits
 
 The integration workspace is Linux, so native Windows runtime and DirectX checks
-require the Windows CI runner. Portable tests exercise report generation, bounded
+require the Windows CI runner. Linux Release configure/build and all four CTest suites passed during integration.
+Settings and diagnostics also passed GCC C++20 strict warning checks and
+AddressSanitizer/UndefinedBehaviorSanitizer runs. Leak detection was disabled
+because of the workspace process-tracing constraints; no leak-check pass is claimed.
+Portable tests exercise report generation, bounded
 history, unsupported measurements, settings round-trip/rejection, renderer frame
 state, and ImGui geometry across multiple window sizes and pages. Windows CI adds
 real process-counter assertions, renderer initialization/resize/presentation/recovery,

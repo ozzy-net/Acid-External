@@ -1,8 +1,8 @@
 # Premium interface
 
 `premium_ui.cpp` owns the theme, sidebar, diagnostics, FOV canvas, and appearance
-controls. `State` preserves the existing radius, circle visibility, and accent
-defaults. Selection highlights and page opacity use delta-time exponential
+controls. `State` inherits the shared JSON configuration and holds transient navigation state.
+The dashboard accepts diagnostics snapshots and returns report/window actions. Selection highlights and page opacity use delta-time exponential
 interpolation. Cards stack below 500 pixels of content width; the sidebar narrows
 below 800 pixels of window width. Content scrolls on smaller windows.
 
@@ -22,13 +22,13 @@ animation convergence.
 To run the test with the Windows build:
 
 ```powershell
-cmake -S . -B build -A x64 -DACID_UI_SMOKE_TEST=ON
+cmake -S . -B build -A x64 -DBUILD_TESTING=ON
 cmake --build build --config Release
 ctest --test-dir build -C Release --output-on-failure
 ```
 
-The editing environment has GCC but no CMake, Windows SDK, DirectX runtime, or
-Windows desktop. Native build, visual appearance, mouse/keyboard interaction,
+Portable CMake/UI tests run on Linux; Windows SDK, DirectX runtime and a
+Windows desktop are required for native validation. Native build, visual appearance, mouse/keyboard interaction,
 title dragging, edge resizing, minimize/restore, and multi-monitor maximize must
 be checked on Windows. Headless tests do not verify those behaviors.
 

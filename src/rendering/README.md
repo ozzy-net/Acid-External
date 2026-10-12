@@ -1,3 +1,7 @@
+The root application now uses this renderer. Build and test the complete application
+with the root CMake project; the standalone project below remains available.
+Hardware initialization falls back to WARP if unavailable.
+
 # DirectX 11 rendering foundation
 
 This module is opt-in. `src/main.cpp` and the root build retain the current UI
