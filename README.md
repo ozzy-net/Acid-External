@@ -25,3 +25,9 @@ cmake --build build --config Release
 ## Cloud agent workstreams
 
 Keep UI, diagnostics, configuration persistence and build automation in separate branches and PRs. Review and test changes before merging.
+
+## Diagnostics module
+
+The standalone [diagnostics library](src/diagnostics/README.md) provides process
+CPU/memory measurements, process uptime, frame history, logging and JSON export.
+See its integration guide for APIs, measurement semantics and standalone tests.
