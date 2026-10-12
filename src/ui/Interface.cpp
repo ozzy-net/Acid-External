@@ -36,7 +36,7 @@ void Interface::draw(HWND hwnd){
     panel("Sidebar",{190*scale,std::max(1.f,io.DisplaySize.y-72*scale)});muted("WORKSPACE");ImGui::Spacing();
     constexpr const char* tabs[]={"Dashboard","Visualization","Diagnostics","Settings"};
     for(int i=0;i<4;++i){ImGui::PushID(i);const auto p=ImGui::GetCursorScreenPos();const ImVec2 size{ImGui::GetContentRegionAvail().x,48*scale};
-        if(ImGui::InvisibleButton(tabs[i],size)){if(tab_!=i){tab_=i;transition_=config_.animations?0:1;}}
+        if(ImGui::InvisibleButton(tabs[i],size)){if(tab_!=i){tab_=i;transition_=config_.animations?0.f:1.f;}}
         const float desired=ImGui::IsItemHovered()?1.f:0.f;hover_[i]=config_.animations?hover_[i]+(desired-hover_[i])*std::min(1.f,io.DeltaTime*12):desired;
         auto* draw=ImGui::GetWindowDrawList();const float alpha=tab_==i?0.28f:0.03f+hover_[i]*0.13f;
         draw->AddRectFilled(p,{p.x+size.x,p.y+size.y},ImGui::ColorConvertFloat4ToU32(accent(config_,alpha)),8*scale);

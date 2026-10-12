@@ -63,7 +63,7 @@ bool Application::recoverDevice(){
     dx11Backend_=ImGui_ImplDX11_Init(renderer_.device(),renderer_.context());diagnostics_.gpu=renderer_.adapter();diagnostics_.resume();return dx11Backend_;
 }
 int Application::run(int show,bool smokeTest){
-    if(!initialize(show))return 1;Interface ui(config_,diagnostics_,configPath_);bool running=true,occluded=false,paused=false;int exitCode=0;unsigned frames=0;
+    if(!initialize(show))return 1;diagnostics_.resume();Interface ui(config_,diagnostics_,configPath_);bool running=true,occluded=false,paused=false;int exitCode=0;unsigned frames=0;
     auto smokeStart=std::chrono::steady_clock::now();
     while(running){const auto frameStart=std::chrono::steady_clock::now();MSG msg{};while(PeekMessageW(&msg,nullptr,0,0,PM_REMOVE)){if(msg.message==WM_QUIT)running=false;TranslateMessage(&msg);DispatchMessageW(&msg);}if(!running)break;
         if(smokeTest&&std::chrono::steady_clock::now()-smokeStart>std::chrono::seconds(20)){exitCode=2;break;}
